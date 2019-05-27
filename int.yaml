@@ -1,0 +1,11 @@
+---
+- 0/1
+name: GigabitEthernet0/1
+description: Server Port
+vlan: 10
+uplink: False
+
+- 0/2
+name: GigabitEthernet0/2
+description: Trunk Port
+uplink: True
