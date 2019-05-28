@@ -12,6 +12,8 @@ def render_yaml():
     print(template.render(interfaces=interface_yaml))
 
 def main():
+    open_yaml()
+    render_yaml()
     
 if __name__ == "__main__":
     main()
