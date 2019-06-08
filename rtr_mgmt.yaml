@@ -1,0 +1,10 @@
+- host: Router1
+  mgmt_ip: 192.168.122.10
+  id: chihyung
+  pw: cisco
+  description: Router 1
+- host: Router2
+  mgmt_ip: 192.168.122.11
+  id: chihyung
+  pw: juniper
+  description: Router 2
