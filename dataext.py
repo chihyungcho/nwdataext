@@ -40,6 +40,7 @@ def parse_ciscoconfig(confdata):
 #def traffic_shift_away():
     #   Traffice shifts away
 
+
 #def config_push():
     #   the config push
 
@@ -70,6 +71,9 @@ def main():
     output1 = net_connect1.send_command('show run')
 #    output2 = net_connect2.send_command('show run')
     print(output1)
+    print('Saving the router1 config...')
+    with open('router1_bkup.conf', 'w') as router1_bkup:
+        router1_bkup.write(output1)
 #    print(output2)
 
     
