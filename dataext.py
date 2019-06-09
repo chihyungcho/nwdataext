@@ -52,6 +52,7 @@ def parse_ciscoconfig(confdata):
 
 def main():
 
+# Pulling the management connection info from a YAML.
     mgmt = open_rtr_mgmt_yaml()
     print('router mgmt: {}'. format(mgmt))
     ip1 = mgmt[0]['mgmt_ip']
@@ -60,22 +61,31 @@ def main():
     ip2 = mgmt[1]['mgmt_ip']
     id2 = mgmt[1]['id']
     pw2 = mgmt[1]['pw']
-    print('Connecting to Router IP: {0}'.format(ip1))
+
+# Connecting to the routers.
+    print('Connecting to Router1 IP: {0}'.format(ip1))
     net_connect1 = get_connection(ip1, id1, pw1)
-#    print('Connecting to Router IP: {0}'.format(ip2))
-#    net_connect2 = get_connection(ip2, id2, pw2)
-    print(net_connect1.find_prompt())
-#    print(net_connect2.find_prompt())
+    print('Connecting to Router2 IP: {0}'.format(ip2))
+    net_connect2 = get_connection(ip2, id2, pw2)
+    print("Router1 Prompt: ", net_connect1.find_prompt())
+    print("Router2 Prompt: ", net_connect2.find_prompt())
+
+# Pulling the configs
     net_connect1.send_command('terminal length 0')
-#    net_connect2.send_command('terminal length 0')
+    net_connect2.send_command('terminal length 0')
     output1 = net_connect1.send_command('show run')
-#    output2 = net_connect2.send_command('show run')
+    output2 = net_connect2.send_command('show run')
     print(output1)
     print('Saving the router1 config...')
     with open('router1_bkup.conf', 'w') as router1_bkup:
         router1_bkup.write(output1)
-#    print(output2)
+    print(output2)
+        print('Saving the router2 config...')
+    with open('router2_bkup.conf', 'w') as router2_bkup:
+        router2_bkup.write(output2)
 
+# Parsing the config
     
+
 if __name__ == "__main__":
     main()
