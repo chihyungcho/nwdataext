@@ -15,79 +15,101 @@ def open_rtr_mgmt_yaml():
 #     print(template.render(rtr_list = rtr_list))
 
 def get_connection(sship, sshid, sshpw): 
-    router1 = {
+    router = {
         'device_type': 'cisco_ios',
         'ip': sship,
         'username': sshid,
         'password': sshpw
         }
-    net_connect = ConnectHandler(**router1)  
+    net_connect = ConnectHandler(**router)  
     return net_connect
 
-def parse_ciscoconfig(confdata):
-#   parsing cisco config using ciscoconfparse library and tranform the data into YAML format.
-    parse = CiscoConfParse(confdata)
+# Parsing cisco config using CiscoConfParse library and tranform the data into YAML format.
+# Currently transitioning from a method to a class.
+class BGP_Extraction:
+    # things in () are for inheritance
+
+#   Parsing cisco config using CiscoConfParse library.
+    def __init__(self, confdata):
+        self.confdata = confdata
+        self.parse = CiscoConfParse(confdata)
+        self.bgp_cmds = self.parse.find_objects(r'^router bgp \d+$')
 
 # Extracting BGP AS Number
-    bgp_cmds = parse.find_objects(r'^router bgp \d+$')
-    bgp_asnum = bgp_cmds[0].text[len('router bgp '):]
+    def as_num(self):
+        bgp_asnum = self.bgp_cmds[0].text[len('router bgp '):]
+        return bgp_asnum
 
 # Extracting bgp router ID
-    bgp_rtrids = bgp_cmds[0].re_search_children\
-                (r'^ bgp router-id [1-2]?[0-9]?[0-9](\.[1-2]?[0-9]?[0-9]){3}$')
-    bgp_rtrid = bgp_rtrids[0].text[len(' bgp router-id '):]
+    def rtrid(self):
+        bgp_rtrids = self.bgp_cmds[0].re_search_children\
+                    (r'^ bgp router-id [1-2]?[0-9]?[0-9](\.[1-2]?[0-9]?[0-9]){3}$')
+        bgp_rtrid = bgp_rtrids[0].text[len(' bgp router-id '):]
+        return bgp_rtrid
 
-# Extracting Neighbor
-    bgp_neis = bgp_cmds[0].re_search_children\
-                (r'^ neighbor [1-2]?[0-9]?[0-9](\.[1-2]?[0-9]?[0-9]){3} remote-as \d{1,5}$')
-    i = 0
-    nei_dict = {}
-    for nei in bgp_neis:
-        i += 1
-        neigh = nei.text[1:].split()
-        nei_dict["neigh"+str(i)] = [neigh[1], neigh[3]]
-    print('nei_dict: ', nei_dict)
+# Extracting BGP Neighbor
+    def nei(self):
+        bgp_neis = self.bgp_cmds[0].re_search_children\
+                    (r'^ neighbor [1-2]?[0-9]?[0-9](\.[1-2]?[0-9]?[0-9]){3} remote-as \d{1,5}$')
+        i = 0
+        nei_dict = {}
+        for nei in bgp_neis:
+            i += 1
+            neigh = nei.text[1:].split()
+            nei_dict["neigh"+str(i)] = [neigh[1], neigh[3]] # Generating dynamic key names in dictionary net_dict
+        # print('nei_dict: ', nei_dict)
+        return nei_dict
 
 # Extracting BGP Network
-    bgp_nets = bgp_cmds[0].re_search_children\
-                (r'^ network [1-2]?[0-9]?[0-9](\.[1-2]?[0-9]?[0-9]){3} mask [1-2]?[0-9]?[0-9](\.[1-2]?[0-9]?[0-9]){3}')
-    j = 0
-    net_dict = {}
-    for net in bgp_nets:
-        j += 1
-        net = net.text[1:].split()
-        net_dict["network"+str(j)] = [net[1], net[3]]
-    print('net_dict: ', net_dict)
+    def net(self):
+        bgp_nets = self.bgp_cmds[0].re_search_children\
+                    (r'^ network [1-2]?[0-9]?[0-9](\.[1-2]?[0-9]?[0-9]){3} mask [1-2]?[0-9]?[0-9](\.[1-2]?[0-9]?[0-9]){3}')
+        j = 0
+        net_dict = {}
+        for net in bgp_nets:
+            j += 1
+            network = net.text[1:].split()
+            net_dict["network"+str(j)] = [network[1], network[3]]
+        # print('net_dict: ', net_dict)
+        return net_dict
 
 # Extracting BGP maximum-paths
-    bgp_maxpaths = bgp_cmds[0].re_search_children(r'^ maximum-paths \d$')
-    bgp_maxpath = bgp_maxpaths[0].text[len(' maximum-paths '):]
-    print('bgp_maxpath: ', bgp_maxpath)
+    def maxpath(self):
+        bgp_maxpaths = self.bgp_cmds[0].re_search_children(r'^ maximum-paths \d$')
+        bgp_maxpath = bgp_maxpaths[0].text[len(' maximum-paths '):]
+        # print('bgp_maxpath: ', bgp_maxpath)
+        return bgp_maxpath
 
+def save_in_yaml(**parsed_data):
+    #   saving config in a YAML file
+    # with open('existing_router1.yaml', 'w') as ext_yaml:
+    #     yaml.dump()
+    pass
 
-# def save_in_yaml(parsed_data)
-#     #   saving config in a YAML file
+def precheck():
+    #   precheck function
+    pass
 
-# def precheck():
-#     #   precheck function
+def traffic_shift_away():
+    #   Traffice shifts away
+    pass
 
-# def traffic_shift_away():
-#     #   Traffice shifts away
+def push_config():
+    #   the config push
+    pass
 
+def post_check():
+    #   post check
+    pass
 
-# def config_push():
-#     #   the config push
-
-# def post_check():
-#     #   post check
-
-# def traffic_restore():
-#     #   traffic restore
+def restore_traffic():
+    #   traffic restore
+    pass
 
 def main():
 # Pulling the management connection info from a YAML.
     mgmt = open_rtr_mgmt_yaml()
-    print('router mgmt: {}'. format(mgmt))
+    print('Loading router mgmt info: {}'. format(mgmt))
     ip1 = mgmt[0]['mgmt_ip']
     id1 = mgmt[0]['id']
     pw1 = mgmt[0]['pw']
@@ -100,8 +122,8 @@ def main():
     net_connect1 = get_connection(ip1, id1, pw1)
     print('Connecting to Router2 IP: {0}'.format(ip2))
     net_connect2 = get_connection(ip2, id2, pw2)
-    print("Router1 Prompt: ", net_connect1.find_prompt())
-    print("Router2 Prompt: ", net_connect2.find_prompt())
+    # print("Router1 Prompt: ", net_connect1.find_prompt())
+    # print("Router2 Prompt: ", net_connect2.find_prompt())
 
 # Pulling the configs
     net_connect1.send_command('terminal length 0')
@@ -118,9 +140,8 @@ def main():
         router2_bkup.write(output2)
 
 # Parsing the config
-    parse_ciscoconfig("router1_bkup.conf")
-    parse_ciscoconfig("router2_bkup.conf")
-
+    rtr1 = BGP_Extraction("router1_bkup.conf")
+    rtr2 = BGP_Extraction("router2_bkup.conf")
 
 
 if __name__ == "__main__":
