@@ -1,3 +1,5 @@
+#! /usr/bin/python
+
 from jinja2 import Environment, FileSystemLoader
 from ciscoconfparse import CiscoConfParse 
 from netmiko import ConnectHandler
@@ -102,44 +104,48 @@ def restore_traffic():
     pass
 
 def main():
-# # Pulling the management connection info from a YAML.
-#     mgmt = open_rtr_mgmt_yaml()
-#     print('Loading router mgmt info: {}'. format(mgmt))
-#     ip1 = mgmt[0]['mgmt_ip']
-#     id1 = mgmt[0]['id']
-#     pw1 = mgmt[0]['pw']
-#     ip2 = mgmt[1]['mgmt_ip']
-#     id2 = mgmt[1]['id']
-#     pw2 = mgmt[1]['pw']
+# Pulling the management connection info from a YAML.
+    mgmt = open_rtr_mgmt_yaml()
+    print('Loading router mgmt info: {}'. format(mgmt))
+    ip1 = mgmt[0]['mgmt_ip']
+    id1 = mgmt[0]['id']
+    pw1 = mgmt[0]['pw']
+    ip2 = mgmt[1]['mgmt_ip']
+    id2 = mgmt[1]['id']
+    pw2 = mgmt[1]['pw']
 
-# # Connecting to the routers.
-#     print('Connecting to Router1 IP: {0}'.format(ip1))
-#     net_connect1 = get_connection(ip1, id1, pw1)
-#     print('Connecting to Router2 IP: {0}'.format(ip2))
-#     net_connect2 = get_connection(ip2, id2, pw2)
-#     # print("Router1 Prompt: ", net_connect1.find_prompt())
-#     # print("Router2 Prompt: ", net_connect2.find_prompt())
+# Connecting to the routers.
+    print('Connecting to Router1 IP: {0}'.format(ip1))
+    net_connect1 = get_connection(ip1, id1, pw1)
+    print('Connecting to Router2 IP: {0}'.format(ip2))
+    net_connect2 = get_connection(ip2, id2, pw2)
+    # print("Router1 Prompt: ", net_connect1.find_prompt())
+    # print("Router2 Prompt: ", net_connect2.find_prompt())
 
-# # Pulling the configs
-#     net_connect1.send_command('terminal length 0')
-#     net_connect2.send_command('terminal length 0')
-#     output1 = net_connect1.send_command('show run')
-#     output2 = net_connect2.send_command('show run')
-#     print(output1)
-#     print('Saving the router1 config...')
-#     with open('router1_bkup.conf', 'w') as router1_bkup:
-#         router1_bkup.write(output1)
-#     print(output2)
-#     print('Saving the router2 config...')
-#     with open('router2_bkup.conf', 'w') as router2_bkup:
-#         router2_bkup.write(output2)
+# Pulling the configs
+    net_connect1.send_command('terminal length 0')
+    net_connect2.send_command('terminal length 0')
+    output1 = net_connect1.send_command('show run')
+    output2 = net_connect2.send_command('show run')
+    print(output1)
+    print('Saving the router1 config...')
+    with open('router1_bkup.conf', 'w') as router1_bkup:
+        router1_bkup.write(output1)
+    print(output2)
+    print('Saving the router2 config...')
+    with open('router2_bkup.conf', 'w') as router2_bkup:
+        router2_bkup.write(output2)
 
 # Parsing the config
     rtr1 = BGP_Extraction("router1_bkup.conf")
-    # rtr2 = BGP_Extraction("router2_bkup.conf")
+    rtr2 = BGP_Extraction("router2_bkup.conf")
     bgp_conf1 = {'bgp_asnum': rtr1.as_num(), 'bgp_rtrid': rtr1.rtr_id(), 'bgp_nei': rtr1.nei(), 'bgp_net': rtr1.net(), 'bgp_maxpath': rtr1.maxpath()}
-    # print(bgp_conf1)
+    print(bgp_conf1)
     save_in_yaml(bgp_conf1, 'router1')
+# Prefix - permitted device version\
+    sh_ver = net_connect1.send_command('show version')
+    pattern = 'System image file is \"\"'
+    dev_ser = re.search(pattern, sh_ver)
 
 if __name__ == "__main__":
     main()
