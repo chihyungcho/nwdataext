@@ -88,6 +88,7 @@ def precheck(device):
 
 #   Traffice shifts away
 def traffic_shift_away(connect, as_number, neighbor, opp_as_number):
+<<<<<<< HEAD
     print('Route map exist?', bool(connect.send_config_set('do show run | se route-map as_tshift'))
     print('Is it EBGP?', bool(as_number != opp_as_number))
     print('connect:', connect, '\nas_number:', as_number, '\nneighbor:', neighbor, '\nopp_as_number:', opp_as_number)
@@ -107,7 +108,23 @@ def traffic_shift_away(connect, as_number, neighbor, opp_as_number):
     else:
         print('Skipping the IBGP neighbor.')
 
-
+    # print(bool(connect.send_config_set('do show run | se route-map as_tshift')))
+    # print(bool(as_number != opp_as_number))
+    # print('connect:', connect, '\nas_number:', as_number, '\nneighbor:', neighbor, '\nopp_as_number:', opp_as_number)
+    if connect.send_config_set('do show run | se route-map as_tshift') and (as_number != opp_as_number):
+        cmd1 = [('router bgp '+as_number), ('neighbor '+neighbor+' route-map as_tshift out')]
+        output1 = connect.send_config_set(cmd1)
+        print(output1)
+    else:
+        print('Traffic shift failed. Error route-map or the neighbor is an iBGP peer.')
+    if connect.send_config_set('do show run | se route-map lp_tshift') and (as_number != opp_as_number):
+        cmd2 = [('router bgp '+as_number), ('neighbor '+neighbor+' route-map lp_tshift in')]
+        output2 = connect.send_config_set(cmd2)
+        print(output2)
+    else:
+        print('Traffic shift failed. Error validating route-map or the neighbor is an iBGP peer.')
+    output3 = connect.send_command('clear ip bgp * soft')
+    print('Initiating BGP Soft reset...'+output3)
 
 #   the config push, adding 1 more span between AS's, BGP Max-path 2
 def push_config():
@@ -171,10 +188,12 @@ def main():
         for i in (rtr2.nei()).values():
 #            print(i[0], i[1])
             traffic_shift_away(net_connect2, rtr2.as_num(), i[0], i[1])
+
         output1 = net_connect1.send_command('clear ip bgp * soft')
         print('Initiating BGP Soft reset...'+output1)
         output2 = net_connect2.send_command('clear ip bgp * soft')
         print('Initiating BGP Soft reset...'+output2)
+
     else:
         print('Precheck failed.')
 
