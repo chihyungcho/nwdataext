@@ -1,0 +1,16 @@
+interface {{int.name}}
+ ip address {{ int.ip }} {{ int.subnet }}
+ duplex full
+!
+router bgp {{ bgp.asnum }}
+ no synchronization
+ bgp router-id {{ bgp.rtrid }}
+ network {{ bgp.netip1 }} mask {{ bgp.netmask1 }}
+ neighbor {{ bgp.nei_ip1 }} remote-as {{ bgp.nei_remoteas1 }}
+ neighbor {{ bgp.nei_ip2 }} remote-as {{ bgp.nei_remoteas2 }}
+ neighbor {{ bgp.nei_ip3 }} remote-as {{ bgp.nei_remoteas3 }}
+ maximum-paths {{ bgp.maxpath }}
+ no auto-summary
+ maximum-paths 2
+
+
