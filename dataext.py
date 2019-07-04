@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#! /usr/bin/env/python
 
 from jinja2 import Environment, FileSystemLoader
 from ciscoconfparse import CiscoConfParse 
@@ -11,11 +11,6 @@ def open_rtr_mgmt_yaml():
         mgmt = yaml.load(rtr_mgmt)
     return mgmt
 
-# def render_yaml(rtr_list):
-#     ENV = Environment(loader=FileSystemLoader("."))
-#     template = ENV.get_template("core.j2")
-#     print(template.render(rtr_list = rtr_list))
-
 def get_connection(sship, sshid, sshpw): 
     router = {
         'device_type': 'cisco_ios',
@@ -26,10 +21,8 @@ def get_connection(sship, sshid, sshpw):
     net_connect = ConnectHandler(**router)  
     return net_connect
 
-# Parsing cisco config using CiscoConfParse library and tranform the data into YAML format.
-# Currently transitioning from a method to a class.
+# Parsing cisco config using CiscoConfParse library.
 class BGP_Extraction:
-#   Parsing cisco config using CiscoConfParse library.
     def __init__(self, confdata):
         self.confdata = confdata
         self.parse = CiscoConfParse(confdata)
@@ -78,35 +71,60 @@ class BGP_Extraction:
         bgp_maxpath = bgp_maxpaths[0].text[len(' maximum-paths '):]
         return bgp_maxpath
 
-def save_in_yaml(parsed_data, rtr_name):
 # saving config in a YAML file
+def save_in_yaml(parsed_data, rtr_name):
     with open('existing_'+rtr_name+'_conf.yaml', 'w') as ext_yaml:
         yaml.dump(parsed_data, ext_yaml, default_flow_style=False)
 
-def precheck():
-    #   precheck function
-    pass
+# Precheck - permitted device version
+def precheck(device):
+    sh_ver = device.send_command('show version')
+    pattern = 'Version \d{1,2}\.\d\(\d{1,2}\)\w'
+    dev_ser = re.search(pattern, sh_ver)
+    if dev_ser.group() == 'Version 12.4(11)T':
+        return True
+    else:
+        print('Version mismatch')
 
-def traffic_shift_away():
-    #   Traffice shifts away
-    pass
+#   Traffice shifts away
+def traffic_shift_away(connect, as_number, neighbor, opp_as_number):
+    print('Route map exist?', bool(connect.send_config_set('do show run | se route-map as_tshift'))
+    print('Is it EBGP?', bool(as_number != opp_as_number))
+    print('connect:', connect, '\nas_number:', as_number, '\nneighbor:', neighbor, '\nopp_as_number:', opp_as_number)
+    if (as_number != opp_as_number):
+        if connect.send_config_set('do show run | se route-map as_tshift'):
+            cmd1 = [('router bgp '+as_number), ('neighbor '+neighbor+' route-map as_tshift out')]
+            output1 = connect.send_config_set(cmd1)
+            print(output1)
+        else:
+            print('no route-map as_tshift exist')
+        if connect.send_config_set('do show run | se route-map lp_tshift') and (as_number != opp_as_number):
+            cmd2 = [('router bgp '+as_number), ('neighbor '+neighbor+' route-map lp_tshift in')]
+            output2 = connect.send_config_set(cmd2)
+            print(output2)
+        else:
+            print('no route-map lp_tshift exist')
+    else:
+        print('Skipping the IBGP neighbor.')
 
+
+
+#   the config push, adding 1 more span between AS's, BGP Max-path 2
 def push_config():
-    #   the config push
     pass
 
+#   post check
 def post_check():
-    #   post check
     pass
 
+#   traffic restore
 def restore_traffic():
-    #   traffic restore
     pass
 
-def main():
 # Pulling the management connection info from a YAML.
+def main():
     mgmt = open_rtr_mgmt_yaml()
-    print('Loading router mgmt info: {}'. format(mgmt))
+    # print('Loading router mgmt info: {}'. format(mgmt))
     ip1 = mgmt[0]['mgmt_ip']
     id1 = mgmt[0]['id']
     pw1 = mgmt[0]['pw']
@@ -127,11 +145,11 @@ def main():
     net_connect2.send_command('terminal length 0')
     output1 = net_connect1.send_command('show run')
     output2 = net_connect2.send_command('show run')
-    print(output1)
+    # print(output1)
     print('Saving the router1 config...')
     with open('router1_bkup.conf', 'w') as router1_bkup:
         router1_bkup.write(output1)
-    print(output2)
+    # print(output2)
     print('Saving the router2 config...')
     with open('router2_bkup.conf', 'w') as router2_bkup:
         router2_bkup.write(output2)
@@ -140,12 +158,30 @@ def main():
     rtr1 = BGP_Extraction("router1_bkup.conf")
     rtr2 = BGP_Extraction("router2_bkup.conf")
     bgp_conf1 = {'bgp_asnum': rtr1.as_num(), 'bgp_rtrid': rtr1.rtr_id(), 'bgp_nei': rtr1.nei(), 'bgp_net': rtr1.net(), 'bgp_maxpath': rtr1.maxpath()}
-    print(bgp_conf1)
+    bgp_conf2 = {'bgp_asnum': rtr2.as_num(), 'bgp_rtrid': rtr2.rtr_id(), 'bgp_nei': rtr2.nei(), 'bgp_net': rtr2.net(), 'bgp_maxpath': rtr2.maxpath()}
+#    print(rtr1.nei())
     save_in_yaml(bgp_conf1, 'router1')
-# Prefix - permitted device version\
-    sh_ver = net_connect1.send_command('show version')
-    pattern = 'System image file is \"\"'
-    dev_ser = re.search(pattern, sh_ver)
+    save_in_yaml(bgp_conf2, 'router2')
+
+# Precheck and T-Shift by changing BGP Local Pref
+    if (precheck(net_connect1) & precheck(net_connect2)):
+        for i in (rtr1.nei()).values():
+#            print(i[0], i[1])
+            traffic_shift_away(net_connect1, rtr1.as_num(), i[0], i[1])
+        for i in (rtr2.nei()).values():
+#            print(i[0], i[1])
+            traffic_shift_away(net_connect2, rtr2.as_num(), i[0], i[1])
+        output1 = net_connect1.send_command('clear ip bgp * soft')
+        print('Initiating BGP Soft reset...'+output1)
+        output2 = net_connect2.send_command('clear ip bgp * soft')
+        print('Initiating BGP Soft reset...'+output2)
+    else:
+        print('Precheck failed.')
+
+# Validate no traffic flow on the device
+
+# Config change on the device
+
 
 if __name__ == "__main__":
     main()
