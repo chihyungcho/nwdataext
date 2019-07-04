@@ -6,5 +6,5 @@
 - host: Router2
   mgmt_ip: 192.168.122.11
   id: chihyung
-  pw: juniper
+  pw: cisco
   description: Router 2
