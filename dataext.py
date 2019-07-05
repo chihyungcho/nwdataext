@@ -30,23 +30,23 @@ class BGP_Extraction:
 
 # Extracting BGP AS Number
     def as_num(self):
-        bgp_asnum = self.bgp_cmds[0].text[len('router bgp '):]
-        return bgp_asnum
+        asnum = self.bgp_cmds[0].text[len('router bgp '):]
+        return asnum
 
 # Extracting bgp router ID
     def rtr_id(self):
-        bgp_rtrids = self.bgp_cmds[0].re_search_children\
+        rtrids = self.bgp_cmds[0].re_search_children\
                     (r'^ bgp router-id [1-2]?[0-9]?[0-9](\.[1-2]?[0-9]?[0-9]){3}$')
-        bgp_rtrid = bgp_rtrids[0].text[len(' bgp router-id '):]
-        return bgp_rtrid
+        rtrid = rtrids[0].text[len(' bgp router-id '):]
+        return rtrid
 
 # Extracting BGP Neighbor
     def nei(self):
-        bgp_neis = self.bgp_cmds[0].re_search_children\
+        neis = self.bgp_cmds[0].re_search_children\
                     (r'^ neighbor [1-2]?[0-9]?[0-9](\.[1-2]?[0-9]?[0-9]){3} remote-as \d{1,5}$')
         i = 0
         nei_dict = []
-        for nei in bgp_neis:
+        for nei in neis:
             neigh = nei.text[1:].split()
             nei_dict.append([neigh[1], neigh[3]])
             i += 1
@@ -54,11 +54,11 @@ class BGP_Extraction:
 
 # Extracting BGP Network
     def net(self):
-        bgp_nets = self.bgp_cmds[0].re_search_children\
+        nets = self.bgp_cmds[0].re_search_children\
                     (r'^ network [1-2]?[0-9]?[0-9](\.[1-2]?[0-9]?[0-9]){3} mask [1-2]?[0-9]?[0-9](\.[1-2]?[0-9]?[0-9]){3}')
         j = 0
         net_dict = []
-        for net in bgp_nets:
+        for net in nets:
             network = net.text[1:].split()
             net_dict.append([network[1], network[3]])
             j += 1
@@ -66,9 +66,9 @@ class BGP_Extraction:
 
 # Extracting BGP maximum-paths
     def maxpath(self):
-        bgp_maxpaths = self.bgp_cmds[0].re_search_children(r'^ maximum-paths \d$')
-        bgp_maxpath = bgp_maxpaths[0].text[len(' maximum-paths '):]
-        return bgp_maxpath
+        maxpaths = self.bgp_cmds[0].re_search_children(r'^ maximum-paths \d$')
+        maxpath = maxpaths[0].text[len(' maximum-paths '):]
+        return maxpath
 
 # saving config in a YAML file
 def save_in_yaml(parsed_data, rtr_name):
@@ -107,12 +107,10 @@ def traffic_shift_away(connect, as_number, neighbor, opp_as_number):
         print('Skipping the IBGP neighbor.')
 
 #   Build config
-def build_config():
+def build_config(conf_data):
     ENV = Environment(loader = FileSystemLoader('.'))
-    bgp_template = ENV.get_template('new_BGP_template.j2')
-    int_template = ENV.get_template('new_int_template.j2')
-    template.render()
-
+    template = ENV.get_template('new_template.j2')
+    return template.render(conf_data)
 
 #   the config push, adding 1 more span between AS's, BGP Max-path 2
 def push_config():
@@ -158,8 +156,8 @@ def main():
 # Parsing the config
     rtr1 = BGP_Extraction("router1_bkup.conf")
     rtr2 = BGP_Extraction("router2_bkup.conf")
-    bgp_conf1 = {'bgp_asnum': rtr1.as_num(), 'bgp_rtrid': rtr1.rtr_id(), 'bgp_nei': rtr1.nei(), 'bgp_net': rtr1.net(), 'bgp_maxpath': rtr1.maxpath()}
-    bgp_conf2 = {'bgp_asnum': rtr2.as_num(), 'bgp_rtrid': rtr2.rtr_id(), 'bgp_nei': rtr2.nei(), 'bgp_net': rtr2.net(), 'bgp_maxpath': rtr2.maxpath()}
+    bgp_conf1 = {'asnum': rtr1.as_num(), 'rtrid': rtr1.rtr_id(), 'nei': rtr1.nei(), 'net': rtr1.net(), 'maxpath': rtr1.maxpath()}
+    bgp_conf2 = {'asnum': rtr2.as_num(), 'rtrid': rtr2.rtr_id(), 'nei': rtr2.nei(), 'net': rtr2.net(), 'maxpath': rtr2.maxpath()}
     save_in_yaml(bgp_conf1, 'router1')
     save_in_yaml(bgp_conf2, 'router2')
 
@@ -182,8 +180,13 @@ def main():
 
 # Validate no traffic flow on the device
 
-# Config change on the device
-
+# Config changes on the devices
+    rtr1_conf_data = yaml.load(open('new_router1_conf.yaml'))
+    rtr2_conf_data = yaml.load(open('new_router2_conf.yaml'))
+    print('Pushing new config into R1...')
+    net_connect1.send_config_set(build_config(rtr1_conf_data))
+    print('Pushing new config into R2...')
+    net_connect2.send_config_set(build_config(rtr2_conf_data))
 
 if __name__ == "__main__":
     main()
