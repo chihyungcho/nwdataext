@@ -1,0 +1,17 @@
+{% for interfaces in int %}
+interface {{interfaces.name}}
+ ip address {{ interfaces.ip }} {{ interfaces.subnet }}
+ duplex full
+{% endfor %}
+
+router bgp {{ bgp.asnum }}
+ no synchronization
+ bgp router-id {{ bgp.rtrid }}
+ {% for net_ip, net_mask in bgp_net.items() %}
+ network {{ net_ip }} mask {{ net_mask }}
+ {% endfor %}
+ {% for nei in bgp_nei %}
+ neighbor {{ nei.neighbor }} remote-as {{ nei.remote_as }}
+ {% endfor %}
+ maximum-paths {{ bgp.maxpath }}
+ no auto-summary

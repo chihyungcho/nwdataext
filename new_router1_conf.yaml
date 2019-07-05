@@ -1,17 +1,23 @@
-bgp_asnum: '12121'
-bgp_maxpath: '2'
+int:
+  - name: Ethernet1/0
+    ip: '12.12.12.1'
+    subnet: '255.255.255.248'
+  - name: Ethernet1/1
+    ip: '13.13.13.1'
+    subnet: '255.255.255.0'
+  - name: Ethernet1/2
+    ip: '21.21.21.1'
+    subnet: '255.255.255.248'
+bgp:
+  asnum: '12121'
+  maxpath: '2'
+  rtrid: 1.1.1.1
 bgp_nei:
-  neigh1:
-  - 12.12.12.2
-  - '21212'
-  neigh2:
-  - 13.13.13.3
-  - '12121'
-  neigh3:
-  - 21.21.21.2
-  - '21212'
+  - neighbor: 12.12.12.2
+    remote_as: '21212'
+  - neighbor: 13.13.13.3
+    remote_as: '12121'
+  - neighbor: 21.21.21.2
+    remote_as: '21212'
 bgp_net:
-  network1:
-  - 1.1.1.0
-  - 255.255.255.128
-bgp_rtrid: 1.1.1.1
+  1.1.1.0: 255.255.255.128
