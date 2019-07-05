@@ -45,12 +45,11 @@ class BGP_Extraction:
         bgp_neis = self.bgp_cmds[0].re_search_children\
                     (r'^ neighbor [1-2]?[0-9]?[0-9](\.[1-2]?[0-9]?[0-9]){3} remote-as \d{1,5}$')
         i = 0
-        nei_dict = {}
+        nei_dict = []
         for nei in bgp_neis:
-            i += 1
             neigh = nei.text[1:].split()
-            nei_dict["neigh"+str(i)] = [neigh[1], neigh[3]] # Generating dynamic key names in dictionary net_dict
-        # print('nei_dict: ', nei_dict)
+            nei_dict.append([neigh[1], neigh[3]])
+            i += 1
         return nei_dict
 
 # Extracting BGP Network
@@ -58,11 +57,11 @@ class BGP_Extraction:
         bgp_nets = self.bgp_cmds[0].re_search_children\
                     (r'^ network [1-2]?[0-9]?[0-9](\.[1-2]?[0-9]?[0-9]){3} mask [1-2]?[0-9]?[0-9](\.[1-2]?[0-9]?[0-9]){3}')
         j = 0
-        net_dict = {}
+        net_dict = []
         for net in bgp_nets:
-            j += 1
             network = net.text[1:].split()
-            net_dict["network"+str(j)] = [network[1], network[3]]
+            net_dict.append([network[1], network[3]])
+            j += 1
         return net_dict
 
 # Extracting BGP maximum-paths
@@ -88,43 +87,32 @@ def precheck(device):
 
 #   Traffice shifts away
 def traffic_shift_away(connect, as_number, neighbor, opp_as_number):
-<<<<<<< HEAD
-    print('Route map exist?', bool(connect.send_config_set('do show run | se route-map as_tshift'))
-    print('Is it EBGP?', bool(as_number != opp_as_number))
-    print('connect:', connect, '\nas_number:', as_number, '\nneighbor:', neighbor, '\nopp_as_number:', opp_as_number)
+#    print('Route map exist?', bool(connect.send_config_set('do show run | se route-map as_tshift')))
+#    print('Is it EBGP?', bool(as_number != opp_as_number))
+#    print('connect:', connect, '\nas_number:', as_number, '\nneighbor:', neighbor, '\nopp_as_number:', opp_as_number)
     if (as_number != opp_as_number):
         if connect.send_config_set('do show run | se route-map as_tshift'):
             cmd1 = [('router bgp '+as_number), ('neighbor '+neighbor+' route-map as_tshift out')]
             output1 = connect.send_config_set(cmd1)
-            print(output1)
+        #    print(output1)
         else:
             print('no route-map as_tshift exist')
-        if connect.send_config_set('do show run | se route-map lp_tshift') and (as_number != opp_as_number):
+        if connect.send_config_set('do show run | se route-map lp_tshift'):
             cmd2 = [('router bgp '+as_number), ('neighbor '+neighbor+' route-map lp_tshift in')]
             output2 = connect.send_config_set(cmd2)
-            print(output2)
+        #    print(output2)
         else:
             print('no route-map lp_tshift exist')
     else:
         print('Skipping the IBGP neighbor.')
 
-    # print(bool(connect.send_config_set('do show run | se route-map as_tshift')))
-    # print(bool(as_number != opp_as_number))
-    # print('connect:', connect, '\nas_number:', as_number, '\nneighbor:', neighbor, '\nopp_as_number:', opp_as_number)
-    if connect.send_config_set('do show run | se route-map as_tshift') and (as_number != opp_as_number):
-        cmd1 = [('router bgp '+as_number), ('neighbor '+neighbor+' route-map as_tshift out')]
-        output1 = connect.send_config_set(cmd1)
-        print(output1)
-    else:
-        print('Traffic shift failed. Error route-map or the neighbor is an iBGP peer.')
-    if connect.send_config_set('do show run | se route-map lp_tshift') and (as_number != opp_as_number):
-        cmd2 = [('router bgp '+as_number), ('neighbor '+neighbor+' route-map lp_tshift in')]
-        output2 = connect.send_config_set(cmd2)
-        print(output2)
-    else:
-        print('Traffic shift failed. Error validating route-map or the neighbor is an iBGP peer.')
-    output3 = connect.send_command('clear ip bgp * soft')
-    print('Initiating BGP Soft reset...'+output3)
+#   Build config
+def build_config():
+    ENV = Environment(loader = FileSystemLoader('.'))
+    bgp_template = ENV.get_template('new_BGP_template.j2')
+    int_template = ENV.get_template('new_int_template.j2')
+    template.render()
+
 
 #   the config push, adding 1 more span between AS's, BGP Max-path 2
 def push_config():
@@ -154,19 +142,15 @@ def main():
     net_connect1 = get_connection(ip1, id1, pw1)
     print('Connecting to Router2 IP: {0}'.format(ip2))
     net_connect2 = get_connection(ip2, id2, pw2)
-    # print("Router1 Prompt: ", net_connect1.find_prompt())
-    # print("Router2 Prompt: ", net_connect2.find_prompt())
 
 # Pulling the configs
     net_connect1.send_command('terminal length 0')
     net_connect2.send_command('terminal length 0')
     output1 = net_connect1.send_command('show run')
     output2 = net_connect2.send_command('show run')
-    # print(output1)
     print('Saving the router1 config...')
     with open('router1_bkup.conf', 'w') as router1_bkup:
         router1_bkup.write(output1)
-    # print(output2)
     print('Saving the router2 config...')
     with open('router2_bkup.conf', 'w') as router2_bkup:
         router2_bkup.write(output2)
@@ -176,24 +160,23 @@ def main():
     rtr2 = BGP_Extraction("router2_bkup.conf")
     bgp_conf1 = {'bgp_asnum': rtr1.as_num(), 'bgp_rtrid': rtr1.rtr_id(), 'bgp_nei': rtr1.nei(), 'bgp_net': rtr1.net(), 'bgp_maxpath': rtr1.maxpath()}
     bgp_conf2 = {'bgp_asnum': rtr2.as_num(), 'bgp_rtrid': rtr2.rtr_id(), 'bgp_nei': rtr2.nei(), 'bgp_net': rtr2.net(), 'bgp_maxpath': rtr2.maxpath()}
-#    print(rtr1.nei())
     save_in_yaml(bgp_conf1, 'router1')
     save_in_yaml(bgp_conf2, 'router2')
 
 # Precheck and T-Shift by changing BGP Local Pref
     if (precheck(net_connect1) & precheck(net_connect2)):
-        for i in (rtr1.nei()).values():
-#            print(i[0], i[1])
+        print('\nPushing config to R1 for T-Shift')
+        for i in rtr1.nei():
+            print('neighbor:', i[0], 'remote-as:', i[1])
             traffic_shift_away(net_connect1, rtr1.as_num(), i[0], i[1])
-        for i in (rtr2.nei()).values():
-#            print(i[0], i[1])
+        print('\nPushing config to R2 for T-Shift')
+        for i in rtr2.nei():
+            print('neighbor:', i[0], 'remote-as:', i[1])
             traffic_shift_away(net_connect2, rtr2.as_num(), i[0], i[1])
-
         output1 = net_connect1.send_command('clear ip bgp * soft')
-        print('Initiating BGP Soft reset...'+output1)
+        print('\nInitiating router1 BGP Soft reset...'+output1)
         output2 = net_connect2.send_command('clear ip bgp * soft')
-        print('Initiating BGP Soft reset...'+output2)
-
+        print('\nInitiating router2 BGP Soft reset...'+output2)
     else:
         print('Precheck failed.')
 
