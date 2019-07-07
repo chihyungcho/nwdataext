@@ -1,6 +1,5 @@
 {% for interfaces in int %}
 interface {{interfaces.name}}
- description UPDATED INTERFACE
  ip address {{ interfaces.ip }} {{ interfaces.subnet }}
  duplex full
  no shutdown

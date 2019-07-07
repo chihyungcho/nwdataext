@@ -66,7 +66,7 @@ class BGP_Extraction:
 
 # Extracting BGP maximum-paths
     def maxpath(self):
-        maxpaths = self.bgp_cmds[0].re_search_children(r'^ maximum-paths \d$')
+        maxpaths = self.bgp_cmds[0].re_search_children(r'^ maximum-paths \d+$')
         maxpath = maxpaths[0].text[len(' maximum-paths '):]
         return maxpath
 
@@ -78,56 +78,60 @@ def save_in_yaml(parsed_data, rtr_name):
 # Precheck - permitted device version
 def precheck(device):
     sh_ver = device.send_command('show version')
-    pattern = 'Version \d{1,2}\.\d\(\d{1,2}\)\w'
+    pattern = r'Version \d{1,2}\.\d\(\d{1,2}\)\w'
     dev_ser = re.search(pattern, sh_ver)
     if dev_ser.group() == 'Version 12.4(11)T':
         return True
     else:
         print('Version mismatch')
 
-#   Traffice shifts away
+# Traffice shifts away
 def traffic_shift_away(connect, as_number, neighbor, opp_as_number):
-#    print('Route map exist?', bool(connect.send_config_set('do show run | se route-map as_tshift')))
-#    print('Is it EBGP?', bool(as_number != opp_as_number))
-#    print('connect:', connect, '\nas_number:', as_number, '\nneighbor:', neighbor, '\nopp_as_number:', opp_as_number)
     if (as_number != opp_as_number):
         if connect.send_config_set('do show run | se route-map as_tshift'):
             cmd1 = [('router bgp '+as_number), ('neighbor '+neighbor+' route-map as_tshift out')]
-            output1 = connect.send_config_set(cmd1)
-        #    print(output1)
+            connect.send_config_set(cmd1)
         else:
             print('no route-map as_tshift exist')
         if connect.send_config_set('do show run | se route-map lp_tshift'):
             cmd2 = [('router bgp '+as_number), ('neighbor '+neighbor+' route-map lp_tshift in')]
             output2 = connect.send_config_set(cmd2)
-        #    print(output2)
         else:
             print('no route-map lp_tshift exist')
     else:
-        print('Skipping the IBGP neighbor.')
+        print('Skipping the IBGP neighbor: '+neighbor)
 
-#   Build config
+# Build config
 def build_config(conf_data):
     ENV = Environment(loader = FileSystemLoader('.'))
     template = ENV.get_template('new_template.j2')
     return template.render(conf_data)
 
-#   the config push, adding 1 more span between AS's, BGP Max-path 2
-def push_config():
-    pass
+# post check
+def post_check(device, router):
+    show_run = device.send_command('show run')
+    with open(router+'_temp.conf', 'w') as router_temp:
+        router_temp.write(show_run)
+    parse = CiscoConfParse(router+'_temp.conf')
+    match = parse.find_objects(r'router bgp \d+$')
+    routemap = match[0].re_search_children(r'^ neighbor [1-2]?[0-9]?[0-9](\.[1-2]?[0-9]?[0-9]){3} remote-as \d+$')
+    return routemap
 
-#   post check
-def post_check():
-    pass
-
-#   traffic restore
-def restore_traffic():
-    pass
+# traffic restore
+def restore_traffic(connect, as_number, neighbor, opp_as_number):
+    if (as_number != opp_as_number):
+        cmd1 = [('router bgp '+as_number), ('no neighbor '+neighbor+' route-map as_tshift out')]
+        output1 = connect.send_config_set(cmd1)
+        # print(output1)
+        cmd2 = [('router bgp '+as_number), ('no neighbor '+neighbor+' route-map lp_tshift in')]
+        output2 = connect.send_config_set(cmd2)
+        # print(output2)
+    else:
+        print('Skipping the IBGP neighbor.')
 
 # Pulling the management connection info from a YAML.
 def main():
     mgmt = open_rtr_mgmt_yaml()
-    # print('Loading router mgmt info: {}'. format(mgmt))
     ip1 = mgmt[0]['mgmt_ip']
     id1 = mgmt[0]['id']
     pw1 = mgmt[0]['pw']
@@ -163,30 +167,57 @@ def main():
 
 # Precheck and T-Shift by changing BGP Local Pref
     if (precheck(net_connect1) & precheck(net_connect2)):
-        print('\nPushing config to R1 for T-Shift')
+        print('\nRouter1 precheck passed.')
+        print('Router2 precheck passed.')
+        print('\nShifting away the traffic on Router1...')
         for i in rtr1.nei():
             print('neighbor:', i[0], 'remote-as:', i[1])
             traffic_shift_away(net_connect1, rtr1.as_num(), i[0], i[1])
-        print('\nPushing config to R2 for T-Shift')
+        print('Shifting away the traffic on Router2...')
         for i in rtr2.nei():
             print('neighbor:', i[0], 'remote-as:', i[1])
             traffic_shift_away(net_connect2, rtr2.as_num(), i[0], i[1])
         output1 = net_connect1.send_command('clear ip bgp * soft')
         print('\nInitiating router1 BGP Soft reset...'+output1)
         output2 = net_connect2.send_command('clear ip bgp * soft')
-        print('\nInitiating router2 BGP Soft reset...'+output2)
+        print('Initiating router2 BGP Soft reset...'+output2)
     else:
         print('Precheck failed.')
 
 # Validate no traffic flow on the device
 
+
 # Config changes on the devices
     rtr1_conf_data = yaml.load(open('new_router1_conf.yaml'))
     rtr2_conf_data = yaml.load(open('new_router2_conf.yaml'))
-    print('Pushing new config into R1...')
+    print('Configuring the Router1...')
     net_connect1.send_config_set(build_config(rtr1_conf_data))
-    print('Pushing new config into R2...')
+    print('Configuring the Router2...')
     net_connect2.send_config_set(build_config(rtr2_conf_data))
+
+# Post check
+    if post_check(net_connect1, 'router1'):
+        print('Router1 Post check passed.')
+    else:
+        print('Router1 Post check failed.')
+    if post_check(net_connect2, 'router2'):
+        print('Router2 Post check passed.')
+    else:
+        print('Router2 Post check failed.')
+
+# Traffic Restore
+    print('\nRestoring traffic on R1...')
+    for i in rtr1.nei():
+        print('neighbor:', i[0], 'remote-as:', i[1])
+        restore_traffic(net_connect1, rtr1.as_num(), i[0], i[1])
+    print('\nRestoring traffic on R2...')
+    for i in rtr2.nei():
+        print('neighbor:', i[0], 'remote-as:', i[1])
+        restore_traffic(net_connect2, rtr2.as_num(), i[0], i[1])
+    output1 = net_connect1.send_command('clear ip bgp * soft') # to reset specific neighbor
+    print('\nInitiating router1 BGP Soft reset...'+output1)
+    output2 = net_connect2.send_command('clear ip bgp * soft') # to reset specific neighbor
+    print('\nInitiating router2 BGP Soft reset...'+output2)
 
 if __name__ == "__main__":
     main()

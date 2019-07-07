@@ -14,10 +14,10 @@ bgp:
   rtrid: 2.2.2.2
 bgp_nei:
   - neighbor: 12.12.12.1
-    remote-as: '12121'
+    remote_as: '12121'
   - neighbor: 21.21.21.1
-    remote-as: '12121'
+    remote_as: '12121'
   - neighbor: 24.24.24.4
-    remote-as: '21212'
+    remote_as: '21212'
 bgp_net:
   2.2.2.0: 255.255.255.128
