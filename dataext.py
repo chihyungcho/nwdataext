@@ -1,24 +1,24 @@
 #! /usr/bin/env/python
 
 from jinja2 import Environment, FileSystemLoader
-from ciscoconfparse import CiscoConfParse 
+from ciscoconfparse import CiscoConfParse
 from netmiko import ConnectHandler
 import yaml
 import re
 
 def open_rtr_mgmt_yaml():
     with open('rtr_mgmt.yaml') as rtr_mgmt:
-        mgmt = yaml.load(rtr_mgmt)
+        mgmt = yaml.safe_load(rtr_mgmt.read())
     return mgmt
 
-def get_connection(sship, sshid, sshpw): 
+def get_connection(sship, sshid, sshpw):
     router = {
         'device_type': 'cisco_ios',
         'ip': sship,
         'username': sshid,
         'password': sshpw
         }
-    net_connect = ConnectHandler(**router)  
+    net_connect = ConnectHandler(**router)
     return net_connect
 
 # Parsing cisco config using CiscoConfParse library.
@@ -95,7 +95,7 @@ def traffic_shift_away(connect, as_number, neighbor, opp_as_number):
             print('no route-map as_tshift exist')
         if connect.send_config_set('do show run | se route-map lp_tshift'):
             cmd2 = [('router bgp '+as_number), ('neighbor '+neighbor+' route-map lp_tshift in')]
-            output2 = connect.send_config_set(cmd2)
+            connect.send_config_set(cmd2)
         else:
             print('no route-map lp_tshift exist')
     else:
@@ -121,11 +121,9 @@ def post_check(device, router):
 def restore_traffic(connect, as_number, neighbor, opp_as_number):
     if (as_number != opp_as_number):
         cmd1 = [('router bgp '+as_number), ('no neighbor '+neighbor+' route-map as_tshift out')]
-        output1 = connect.send_config_set(cmd1)
-        # print(output1)
+        connect.send_config_set(cmd1)
         cmd2 = [('router bgp '+as_number), ('no neighbor '+neighbor+' route-map lp_tshift in')]
-        output2 = connect.send_config_set(cmd2)
-        # print(output2)
+        connect.send_config_set(cmd2)
     else:
         print('Skipping the IBGP neighbor.')
 
@@ -150,7 +148,7 @@ def main():
     net_connect2.send_command('terminal length 0')
     output1 = net_connect1.send_command('show run')
     output2 = net_connect2.send_command('show run')
-    print('Saving the router1 config...')
+    print('\nSaving the router1 config...')
     with open('router1_bkup.conf', 'w') as router1_bkup:
         router1_bkup.write(output1)
     print('Saving the router2 config...')
@@ -188,18 +186,20 @@ def main():
 
 
 # Config changes on the devices
-    rtr1_conf_data = yaml.load(open('new_router1_conf.yaml'))
-    rtr2_conf_data = yaml.load(open('new_router2_conf.yaml'))
-    print('Configuring the Router1...')
+    with open('new_router1_conf.yaml') as new_rtr1_conf:
+    rtr1_conf_data = yaml.safe_load(new_rtr1_conf.read()))
+    with open('new_router2_conf.yaml') as new_rtr2_conf:
+    rtr2_conf_data = yaml.safe_load(new_rtr2_conf.read()))
+    print('\nConfiguring the Router1...')
     net_connect1.send_config_set(build_config(rtr1_conf_data))
     print('Configuring the Router2...')
     net_connect2.send_config_set(build_config(rtr2_conf_data))
 
 # Post check
     if post_check(net_connect1, 'router1'):
-        print('Router1 Post check passed.')
+        print('\nRouter1 Post check passed.')
     else:
-        print('Router1 Post check failed.')
+        print('\nRouter1 Post check failed.')
     if post_check(net_connect2, 'router2'):
         print('Router2 Post check passed.')
     else:
@@ -210,14 +210,14 @@ def main():
     for i in rtr1.nei():
         print('neighbor:', i[0], 'remote-as:', i[1])
         restore_traffic(net_connect1, rtr1.as_num(), i[0], i[1])
-    print('\nRestoring traffic on R2...')
+    print('Restoring traffic on R2...')
     for i in rtr2.nei():
         print('neighbor:', i[0], 'remote-as:', i[1])
         restore_traffic(net_connect2, rtr2.as_num(), i[0], i[1])
     output1 = net_connect1.send_command('clear ip bgp * soft') # to reset specific neighbor
     print('\nInitiating router1 BGP Soft reset...'+output1)
     output2 = net_connect2.send_command('clear ip bgp * soft') # to reset specific neighbor
-    print('\nInitiating router2 BGP Soft reset...'+output2)
+    print('Initiating router2 BGP Soft reset...'+output2)
 
 if __name__ == "__main__":
     main()
