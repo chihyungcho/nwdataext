@@ -187,9 +187,9 @@ def main():
 
 # Config changes on the devices
     with open('new_router1_conf.yaml') as new_rtr1_conf:
-    rtr1_conf_data = yaml.safe_load(new_rtr1_conf.read()))
+        rtr1_conf_data = yaml.safe_load(new_rtr1_conf.read())
     with open('new_router2_conf.yaml') as new_rtr2_conf:
-    rtr2_conf_data = yaml.safe_load(new_rtr2_conf.read()))
+        rtr2_conf_data = yaml.safe_load(new_rtr2_conf.read())
     print('\nConfiguring the Router1...')
     net_connect1.send_config_set(build_config(rtr1_conf_data))
     print('Configuring the Router2...')
